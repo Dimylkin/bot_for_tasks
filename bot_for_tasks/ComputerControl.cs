@@ -147,7 +147,7 @@ namespace bot_for_tasks
             return statusProcess;
         }
 
-        public static List<string> InfoProcess(int? id = null, string name = null)
+        public static List<string> InfoProcess(int? id = null, string? name = null)
         {
             var result = new List<string>();
 
@@ -233,7 +233,7 @@ namespace bot_for_tasks
             }
         }
 
-        public static string KillProcess(int? processId = null, string processName = null)
+        public static string KillProcess(int? processId = null, string? processName = null)
         {
             try
             {

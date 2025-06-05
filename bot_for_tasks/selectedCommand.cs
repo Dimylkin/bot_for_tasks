@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics;
 using System.Text;
 using Telegram.Bot;
+using Telegram.Bot.Exceptions;
 using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.ReplyMarkups;
@@ -9,20 +10,19 @@ namespace bot_for_tasks
 {
     class selectedCommand
     {
-        private computerControl _;
+        private readonly computerControl? _;
 
         static void Main(string[] args)
         {
             var client = new TelegramBotClient("8088463398:AAEPRGD9tS804ODqnAqbt69RbrWt887iOGU");
-            var command = new selectedCommand();
-            client.StartReceiving(command.Update, command.Error);
+            client.StartReceiving(Update, Error);
             Console.ReadLine();
         }
 
         private static Dictionary<long, bool> _authenticatedUsers = new Dictionary<long, bool>();
-        private Dictionary<long, string> _awaitingInput = new Dictionary<long, string>();
+        private static Dictionary<long, string> _awaitingInput = new Dictionary<long, string>();
 
-        async Task Update(ITelegramBotClient botClient, Update update, CancellationToken token)
+        async static Task Update(ITelegramBotClient botClient, Update update, CancellationToken token)
         {
             var message = update.Message;
             if (message?.Text == null) return;
@@ -33,7 +33,7 @@ namespace bot_for_tasks
             {
                 if (!_awaitingInput.ContainsKey(chatId))
                 {
-                    await botClient.SendTextMessageAsync(chatId, "🔒 Введите пароль для доступа:");
+                    await botClient.SendMessage(chatId, "🔒 Введите пароль для доступа:");
                     _awaitingInput[chatId] = "waiting_password";
                     return;
                 }
@@ -46,12 +46,12 @@ namespace bot_for_tasks
                     {
                         _authenticatedUsers[chatId] = true;
                         _awaitingInput.Remove(chatId);
-                        await botClient.SendTextMessageAsync(chatId, "✅ Доступ разрешён!");
+                        await botClient.SendMessage(chatId, "✅ Доступ разрешён!");
                         await ShowMainMenu(botClient, chatId);
                     }
                     else
                     {
-                        await botClient.SendTextMessageAsync(chatId, "❌ Неверный пароль!");
+                        await botClient.SendMessage(chatId, "❌ Неверный пароль!");
                     }
                 }
                 return;
@@ -95,17 +95,6 @@ namespace bot_for_tasks
                     await botClient.SendMessage(chatId, "Выберите действие с процессом:", replyMarkup: choise_process);
                     _awaitingInput[chatId] = "waiting_process_choice";
                     break;
-                case "Настройка":
-                    var choise_settings = new ReplyKeyboardMarkup(
-                    [
-                        new[] { new KeyboardButton("Отчистить чат"), new KeyboardButton("Выдать права администратора") },
-                    ])
-                    {
-                        ResizeKeyboard = true
-                    };
-                    await botClient.SendMessage(chatId, "Выберите действие с ботом:", replyMarkup: choise_settings);
-                    _awaitingInput[chatId] = "waiting_bot_settings";
-                    break;
                 default:
                     if (_awaitingInput.TryGetValue(chatId, out var inputType))
                     {
@@ -133,11 +122,11 @@ namespace bot_for_tasks
 
                                 if (processInfo.Count == 0)
                                 {
-                                    await botClient.SendTextMessageAsync(chatId, "Не удалось получить информацию о процессе");
+                                    await botClient.SendMessage(chatId, "Не удалось получить информацию о процессе");
                                 }
                                 else if (processInfo.Count == 1)
                                 {
-                                    await botClient.SendTextMessageAsync(chatId, processInfo[0]);
+                                    await botClient.SendMessage(chatId, processInfo[0]);
                                 }
                                 else
                                 {
@@ -159,12 +148,12 @@ namespace bot_for_tasks
                                     string responseText = response.ToString();
                                     if (responseText.Length > 4000)
                                     {
-                                        await botClient.SendTextMessageAsync(chatId, responseText.Substring(0, 4000));
-                                        await botClient.SendTextMessageAsync(chatId, "И ещё " + (processInfo.Count / 2 - 3) + " процессов...");
+                                        await botClient.SendMessage(chatId, responseText.Substring(0, 4000));
+                                        await botClient.SendMessage(chatId, "И ещё " + (processInfo.Count / 2 - 3) + " процессов...");
                                     }
                                     else
                                     {
-                                        await botClient.SendTextMessageAsync(chatId, responseText);
+                                        await botClient.SendMessage(chatId, responseText);
                                     }
                                 }
 
@@ -176,12 +165,12 @@ namespace bot_for_tasks
                                 if (int.TryParse(input_process_close, out int processId))
                                 {
                                     string info = computerControl.KillProcess(processId: processId);
-                                    await botClient.SendTextMessageAsync(chatId, info);
+                                    await botClient.SendMessage(chatId, info);
                                 }
                                 else
                                 {
                                     string info = computerControl.KillProcess(processName: input_process_close);
-                                    await botClient.SendTextMessageAsync(chatId, info);
+                                    await botClient.SendMessage(chatId, info);
                                 }
 
                                 await ShowMainMenu(botClient, chatId);
@@ -190,7 +179,7 @@ namespace bot_for_tasks
                                 string filePath = message.Text.Trim();
                                 string result = computerControl.StartProcess(filePath);
 
-                                await botClient.SendTextMessageAsync(chatId, result);
+                                await botClient.SendMessage(chatId, result);
                                 await ShowMainMenu(botClient, chatId);
                                 break;
                         }
@@ -200,7 +189,7 @@ namespace bot_for_tasks
         }
 
 
-        private async Task HandleStatusChoice(ITelegramBotClient botClient, long chatId, Message message)
+        private static async Task HandleStatusChoice(ITelegramBotClient botClient, long chatId, Message message)
         {
             List<string> statusMessages;
             bool level;
@@ -229,7 +218,7 @@ namespace bot_for_tasks
             await botClient.SendMessage(chatId, string.Join("\n", statusMessages));
             await ShowMainMenu(botClient, chatId);
         }
-        private async Task HandleProcessChoice(ITelegramBotClient botClient, long chatId, Message message)
+        private static async Task HandleProcessChoice(ITelegramBotClient botClient, long chatId, Message message)
         {
             if (message.Text == "Запущенные процессы")
             {
@@ -240,7 +229,7 @@ namespace bot_for_tasks
 
                 await using (var stream = System.IO.File.OpenRead(tempFile))
                 {
-                    await botClient.SendDocumentAsync(chatId, InputFile.FromStream(stream, "processes.txt"), caption: "📁 Полный список процессов");
+                    await botClient.SendDocument(chatId, InputFile.FromStream(stream, "processes.txt"), caption: "📁 Полный список процессов");
                 }
 
                 File.Delete(tempFile);
@@ -248,19 +237,19 @@ namespace bot_for_tasks
             }
             else if (message.Text == "Информация по процессу")
             {
-                await botClient.SendTextMessageAsync(chatId, "Введите ID процесса или его имя:");
+                await botClient.SendMessage(chatId, "Введите ID процесса или его имя:");
                 _awaitingInput[chatId] = "waiting_process_info";
                 return;
             }
             else if (message.Text == "Завершить процесс")
             {
-                await botClient.SendTextMessageAsync(chatId, "Введите ID процесса или его имя:");
+                await botClient.SendMessage(chatId, "Введите ID процесса или его имя:");
                 _awaitingInput[chatId] = "waiting_process_end";
                 return;
             }
             else if (message.Text == "Запустить процесс")
             {
-                await botClient.SendTextMessageAsync(chatId, "Введите путь до файла:");
+                await botClient.SendMessage(chatId, "Введите путь до файла:");
                 _awaitingInput[chatId] = "waiting_process_start";
                 return;
             }
@@ -271,7 +260,7 @@ namespace bot_for_tasks
             }
         }
 
-        private async Task ShowMainMenu(ITelegramBotClient botClient, long chatId)
+        private static async Task ShowMainMenu(ITelegramBotClient botClient, long chatId)
         {
             var choise_operation = new ReplyKeyboardMarkup(
             [
@@ -282,13 +271,46 @@ namespace bot_for_tasks
                 ResizeKeyboard = true
             };
 
-            await botClient.SendTextMessageAsync(chatId, "Выберите действие:", replyMarkup: choise_operation);
+            await botClient.SendMessage(chatId, "Выберите действие:", replyMarkup: choise_operation);
         }
 
 
-        private async Task Error(ITelegramBotClient client, Exception exception, HandleErrorSource source, CancellationToken token)
+        private static async Task Error(ITelegramBotClient client, Exception exception, HandleErrorSource source, CancellationToken token)
         {
-            throw new NotImplementedException();
+            try
+            {
+                string errorMessage = $"⚠️ Произошла ошибка:\n" +
+                                    $"• Источник: {source}\n" +
+                                    $"• Тип: {exception.GetType().Name}\n" +
+                                    $"• Сообщение: {exception.Message}\n" +
+                                    $"• StackTrace: {exception.StackTrace}";
+
+                Console.WriteLine(errorMessage);
+
+                long adminId = 1182102008;
+                try
+                {
+                    await client.SendMessage(chatId: adminId, text: $"🚨 Ошибка бота:\n{exception.Message}", cancellationToken: token);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Не удалось уведомить администратора: {ex.Message}");
+                }
+
+                if (exception is ApiRequestException apiException)
+                {
+                    Console.WriteLine($"API Error Code: {apiException.ErrorCode}");
+                    Console.WriteLine($"API Description: {apiException.Message}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Критическая ошибка в обработчике ошибок: {ex}");
+            }
+            finally
+            {
+                await Task.CompletedTask;
+            }
         }
     }
 }
